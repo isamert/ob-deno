@@ -1,5 +1,6 @@
 #+TITLE: ob-deno
 
+[[https://stable.melpa.org/#/ob-deno][file:https://stable.melpa.org/packages/ob-deno-badge.svg]]
 [[https://melpa.org/#/ob-deno][file:https://melpa.org/packages/ob-deno-badge.svg]]
 
 Babel Functions for Javascript/TypeScript with Deno.
