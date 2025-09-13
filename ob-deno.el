@@ -51,7 +51,7 @@
   :safe #'stringp)
 
 (defcustom ob-deno-function-wrapper
-  "Deno.stdout.write(new TextEncoder().encode(JSON.stringify(await (async () => {%s})())));"
+  "Deno.stdout.write(new TextEncoder().encode(JSON.stringify(await (async () => {%s})(), null, 2)));"
   "JS/TS code to print value of body.
 %s is replaced with code body, without the imports.  Imports are
 injected to the beginning of the file."
@@ -172,12 +172,12 @@ Preserves key order and empty rows."
         ;; Collect keys and build row in insertion order
         (maphash (lambda (key value)
                    (setq keys (append keys (list key)))
-                   (setq row (append row (list (if value (format "%s" value) "")))))
+                   (setq row (append row (list (if value (ob-deno--format-value value) "")))))
                  json-array)
         (append (list keys 'hline) (list row))))
 
      ;; Case 2: Array of Objects (vector of hash tables)
-     ((and (vectorp json-array) (hash-table-p (aref json-array 0)))
+     ((and (vectorp json-array) (seq-every-p #'hash-table-p json-array))
       (let ((keys '()))
         ;; Collect all keys in order of appearance across all objects
         (mapc (lambda (obj)
@@ -189,13 +189,13 @@ Preserves key order and empty rows."
         (let ((rows (mapcar (lambda (obj)
                               (mapcar (lambda (key)
                                         (let ((value (gethash key obj)))
-                                          (if value (format "%s" value) "")))
+                                          (if value (ob-deno--format-value value) "")))
                                       keys))
                             (append json-array nil))))
           (append (list keys 'hline) rows))))
 
      ;; Case 3: Array of Arrays (vector of vectors)
-     ((and (vectorp json-array) (vectorp (aref json-array 0)))
+     ((and (vectorp json-array) (seq-every-p #'vectorp json-array))
       (mapcar (lambda (row)
                 (if (seq-empty-p row)
                     (make-list (length (aref json-array 0)) "")
@@ -203,11 +203,21 @@ Preserves key order and empty rows."
               json-array))
 
      ;; Case 4: Array of Primitives (flat vector)
-     ((vectorp json-array)
+     ((and (vectorp json-array) (seq-every-p #'ob-deno--primitive? json-array))
       (list (append json-array nil)))
 
      ;; Fallback: Return RESULTS unchanged
      (t results))))
+
+(defun ob-deno--primitive? (x)
+  "Is X a primitive value?"
+  (not (or (arrayp x) (hash-table-p x))))
+
+(defun ob-deno--format-value (x)
+  "Format X depending on it's complexity."
+  (if (ob-deno--primitive? x)
+      (format "%s" x)
+    (json-serialize x)))
 
 (defun ob-deno-var-to-deno (val colnames &optional obj?)
   "Convert VAL into a JS/TS variable.
