@@ -6,7 +6,7 @@
 ;; Author: HIGASHI Taiju (2020-2024), Isa Mert Gurbuz (2024-)
 ;; Keywords: literate programming, reproducible research, javascript, typescript, tools, deno
 ;; Homepage: https://github.com/isamert/ob-deno
-;; Version: 2.0.1
+;; Version: 3.0.0
 ;; Package-Requires: ((emacs "29.1"))
 
 ;; SPDX-License-Identifier: GPL-3.0-or-later
