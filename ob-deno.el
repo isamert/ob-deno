@@ -51,7 +51,7 @@
   :safe #'stringp)
 
 (defcustom ob-deno-function-wrapper
-  "Deno.stdout.write(new TextEncoder().encode(Deno.inspect(await (async () => {%s})())));"
+  "Deno.stdout.write(new TextEncoder().encode(JSON.stringify(await (async () => {%s})())));"
   "JS/TS code to print value of body.
 %s is replaced with code body, without the imports.  Imports are
 injected to the beginning of the file."
@@ -160,22 +160,54 @@ which can be specified by VALUES."
     (format "--allow-%s" allow-param)))
 
 (defun ob-deno-read (results)
-  "Convert RESULTS into an appropriate elisp value.
-If RESULTS look like a table, then convert them into an
-Emacs-lisp table, otherwise return the results as a string."
-  (org-babel-read
-   (if (and (stringp results)
-            (string-prefix-p "[" results)
-            (string-suffix-p "]" results))
-       (org-babel-read
-        (concat "'"
-                (replace-regexp-in-string
-                 "\\[" "(" (replace-regexp-in-string
-                            "\\]" ")" (replace-regexp-in-string
-                                       ",[[:space:]]" " "
-                                       (replace-regexp-in-string
-                                        "'" "\"" results))))))
-     results)))
+  "Convert RESULTS into an Org-mode table recognized by Org Babel.
+Handles JSON arrays of objects, arrays, primitives, and single objects.
+Preserves key order and empty rows."
+  (let ((json-array (json-parse-string results)))
+    (cond
+     ;; Case 1: Single Object (hash table)
+     ((hash-table-p json-array)
+      (let ((keys '())
+            (row '()))
+        ;; Collect keys and build row in insertion order
+        (maphash (lambda (key value)
+                   (setq keys (append keys (list key)))
+                   (setq row (append row (list (if value (format "%s" value) "")))))
+                 json-array)
+        (append (list keys 'hline) (list row))))
+
+     ;; Case 2: Array of Objects (vector of hash tables)
+     ((and (vectorp json-array) (hash-table-p (aref json-array 0)))
+      (let ((keys '()))
+        ;; Collect all keys in order of appearance across all objects
+        (mapc (lambda (obj)
+                (maphash (lambda (key _)
+                           (unless (member key keys)
+                             (setq keys (append keys (list key)))))
+                         obj))
+              json-array)
+        (let ((rows (mapcar (lambda (obj)
+                              (mapcar (lambda (key)
+                                        (let ((value (gethash key obj)))
+                                          (if value (format "%s" value) "")))
+                                      keys))
+                            (append json-array nil))))
+          (append (list keys 'hline) rows))))
+
+     ;; Case 3: Array of Arrays (vector of vectors)
+     ((and (vectorp json-array) (vectorp (aref json-array 0)))
+      (mapcar (lambda (row)
+                (if (seq-empty-p row)
+                    (make-list (length (aref json-array 0)) "")
+                  (append row nil)))
+              json-array))
+
+     ;; Case 4: Array of Primitives (flat vector)
+     ((vectorp json-array)
+      (list (append json-array nil)))
+
+     ;; Fallback: Return RESULTS unchanged
+     (t results))))
 
 (defun ob-deno-var-to-deno (val colnames &optional obj?)
   "Convert VAL into a JS/TS variable.
