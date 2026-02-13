@@ -86,8 +86,9 @@ injected to the beginning of the file."
 IMPORTS are defined at the top and PARAMS are defined right after them.
 REST is appended to the end."
   (concat
-   imports
-   "\n\n"
+   (if (and imports (not (string-empty-p imports)))
+       (concat imports "\n\n")
+     "")
    (org-babel-expand-body:generic
     rest params (org-babel-variable-assignments:deno params))))
 
