@@ -51,7 +51,7 @@
   :safe #'stringp)
 
 (defcustom ob-deno-function-wrapper
-  "Deno.stdout.write(new TextEncoder().encode(JSON.stringify(await (async () => {%s})(), null, 2)));"
+  "Deno.stdout.write(new TextEncoder().encode(JSON.stringify(await (async () => {\n%s\n})(), null, 2)));"
   "JS/TS code to print value of body.
 %s is replaced with code body, without the imports.  Imports are
 injected to the beginning of the file."
